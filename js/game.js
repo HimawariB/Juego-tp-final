@@ -34,7 +34,11 @@ function preload() {
 function create() {
     player = this.physics.add.sprite(400, 500, 'player').setCollideWorldBounds(true);
 
-  
+    bullets = this.physics.add.group({
+        classType: Bullet,
+        maxSize: 10,
+        runChildUpdate: true
+    });
 
     enemies = this.physics.add.group({
         key: 'enemy',
@@ -43,17 +47,16 @@ function create() {
     });
 
     enemies.children.iterate(function (enemy) {
-        enemy.setVelocityY(30); // Velocidad hacia abajo
+        enemy.setVelocityY(50); // Velocidad hacia abajo
     });
 
     cursors = this.input.keyboard.createCursorKeys();
 
-    
+    this.input.keyboard.on('keydown-SPACE', shootBullet, this);
+
     this.physics.add.collider(bullets, enemies, hitEnemy, null, this);
     this.physics.add.collider(player, enemies, hitPlayer, null, this);
-
 }
-
 
 function update(time, delta) {
     if (gameOver) {
@@ -78,26 +81,16 @@ function update(time, delta) {
     } else {
         player.setVelocityY(0);
     }
-
-    for (let i = 0; 1 < bulletArray.lenght; i++) {
-        let bullet = bulletArray[i];
-        bullet.y += bulletVelocityY;
-        context.fillStyle="white";
-        context.fillRect(bullet.x, bullet.y, bullet.width, bullet.height);
-    }
-
 }
 
-function shoot(e) {
-    if (e.code == "Space") {
-        let bullet = {
-            x: araña.x + arañaWidth*15/32,
-            y: araña.y,
-            width: tileSize/8,
-            height: tileSize/2,
-            used: false
+function shootBullet() {
+    if (this.time.now > lastFired) {
+        let bullet = bullets.get();
+
+        if (bullet) {
+            bullet.fire(player.x, player.y);
+            lastFired = this.time.now + fireRate;
         }
-        bulletArray.push(bullet);
     }
 }
 
@@ -120,22 +113,12 @@ class Bullet extends Phaser.Physics.Arcade.Image {
         this.setActive(true);
         this.setVisible(true);
         this.setVelocityY(-300);
-
-        if (direction === 'up') {
-            this.setVelocityY(-300);
-        } else if (direction === 'down') {
-            this.setVelocityY(300);
-        } else if (direction === 'left') {
-            this.setVelocityX(-300);
-        } else if (direction === 'right') {
-            this.setVelocityX(300);
-        }
     }
 
     preUpdate(time, delta) {
         super.preUpdate(time, delta);
 
-        if (this.y <= 0 || this.y >= 600 || this.x <= 0 || this.x >= 800) {
+        if (this.y <= 0) {
             this.setActive(false);
             this.setVisible(false);
         }
