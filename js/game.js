@@ -34,6 +34,10 @@ function preload() {
 function create() {
     player = this.physics.add.sprite(400, 500, 'player').setCollideWorldBounds(true);
 
+    player.setScale(1);
+    player.setSize(40, 40);
+
+    
     bullets = this.physics.add.group({
         classType: Bullet,
         maxSize: 10,
@@ -42,7 +46,7 @@ function create() {
 
     enemies = this.physics.add.group({
         key: 'enemy',
-        repeat: 5,
+        repeat: 6,
         setXY: { x: 100, y: 100, stepX: 100 }
     });
 
