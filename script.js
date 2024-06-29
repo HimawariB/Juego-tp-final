@@ -32,20 +32,24 @@ var enemyInfo = {
     padding: 5
 };
 
+var score = 0;
+var lives = 3;
+var isStarted = false;
+var ufoCount = 0;
+var enemySpeed = 1; // Velocidad inicial de los enemigos
+var enemyBulletSpeed = 100; // Velocidad inicial de las balas enemigas
+var moveDirection = 1; // 1: derecha, -1: izquierda
+var moveDistance = 10;
+var moveDownDistance = 20;
+
+var scene, shooter, cursors, keyA, keyD, isShooting, scoreText, livesText, startText, enemies, playerLava, enemyLava, saucerLava;
+
 function preload() {
     this.load.image("shooter", "assets/araña.png");
     this.load.image("alien", "assets/abeja.png");
     this.load.image("bullet", "assets/bala.png");
     this.load.image("saucer", "assets/abejados.png");
 }
-
-var score = 0;
-var lives = 3;
-var isStarted = false;
-var barriers = [];
-var ufoCount = 0;
-var enemySpeed = 10;
-var enemyBulletSpeed = 200;
 
 function create() {
     scene = this;
@@ -54,7 +58,9 @@ function create() {
     keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     isShooting = false;
     this.input.keyboard.addCapture('SPACE');
-    enemies = this.physics.add.staticGroup();
+    
+    // Grupos y objetos del juego
+    enemies = this.physics.add.group();
     playerLava = scene.add.rectangle(0, 0, 800, 10, 0x000).setOrigin(0);
     enemyLava = scene.add.rectangle(0, 590, 800, 10, 0x000).setOrigin(0);
     saucerLava = scene.add.rectangle(790, 0, 10, 600, 0x000).setOrigin(0);
@@ -62,31 +68,45 @@ function create() {
     scene.physics.add.existing(enemyLava);
     scene.physics.add.existing(saucerLava);
 
-    shooter = scene.physics.add.sprite(400, 560, 'shooter');
+    // Creación del jugador (shooter)
+    shooter = scene.physics.add.sprite(400, 520, 'shooter');
     shooter.setCollideWorldBounds(true);
 
+    // Textos en pantalla
     scoreText = scene.add.text(16, 16, "Score: " + score, { fontSize: '18px', fill: '#FFF' });
     livesText = scene.add.text(696, 16, "Lives: " + lives, { fontSize: '18px', fill: '#FFF' });
     startText = scene.add.text(400, 300, "Click to Play", { fontSize: '18px', fill: '#FFF' }).setOrigin(0.5);
 
+    // Eventos de entrada (teclado y ratón)
     this.input.keyboard.on('keydown-SPACE', shoot);
-
     this.input.on('pointerdown', function () {
         if (!isStarted) {
             isStarted = true;
             startText.destroy();
-            setInterval(makeSaucer, 15000);
+            setInterval(makeSaucer, 15000); // Cada 15 segundos aparece un saucer
         } else {
             shoot();
         }
     });
 
-    initEnemies();
-    setInterval(enemyFire, 3000);
+    initEnemies(); // Inicializa los enemigos
+    setInterval(enemyFire, 3000); // Disparo de los enemigos cada 3 segundos
+
+    // Colisión entre enemigos y shooter
+    this.physics.add.collider(enemies, shooter, function (shooter, enemy) {
+        enemy.destroy();
+        lives--;
+        livesText.setText("Lives: " + lives);
+
+        if (lives === 0) {
+            end("Lose");
+        }
+    });
 }
 
 function update() {
     if (isStarted) {
+        // Movimiento del jugador (shooter)
         if (cursors.left.isDown || keyA.isDown) {
             shooter.setVelocityX(-160);
         } else if (cursors.right.isDown || keyD.isDown) {
@@ -94,6 +114,8 @@ function update() {
         } else {
             shooter.setVelocityX(0);
         }
+
+        moveEnemies(); // Movimiento de los enemigos en cada actualización
     }
 }
 
@@ -117,42 +139,32 @@ function initEnemies() {
 }
 
 function resetEnemies() {
-    xTimes = 0;
-    dir = "right";
-    enemySpeed *= 2;  // Duplica la velocidad de los enemigos
-    enemyBulletSpeed *= 2;  // Duplica la velocidad de las balas enemigas
+    enemySpeed += 1;  // Incrementa la velocidad de los enemigos en 5
+    enemyBulletSpeed += 40;  // Incrementa la velocidad de las balas enemigas en 40
     initEnemies();
 }
 
-setInterval(moveEnemies, 1000);
-
-var xTimes = 0;
-var dir = "right";
-
 function moveEnemies() {
-    if (isStarted) {
-        var moveDown = false;
-        var deltaX = dir === "right" ? enemySpeed : -enemySpeed;
-
-        enemies.children.each(function (enemy) {
-            enemy.x += deltaX;
-            enemy.body.reset(enemy.x, enemy.y);
-            if (enemy.x <= enemyInfo.offset.left || enemy.x >= config.width - enemyInfo.offset.left) {
-                moveDown = true;
-            }
-        });
-
-        if (moveDown) {
-            dir = dir === "right" ? "left" : "right";
-            enemies.children.each(function (enemy) {
-                enemy.y += 10;
-                enemy.body.reset(enemy.x, enemy.y);
-            });
+    var moveDown = false;
+    enemies.children.each(function (enemy) {
+        enemy.x += enemySpeed * moveDirection;
+        
+        // Verifica si el enemigo debe moverse hacia abajo al llegar a los bordes
+        if (enemy.x <= enemyInfo.offset.left || enemy.x >= config.width - enemyInfo.offset.left - enemy.width) {
+            moveDown = true;
         }
+        enemy.body.reset(enemy.x, enemy.y);
+    });
 
-        xTimes++;
+    if (moveDown) {
+        enemies.children.each(function (enemy) {
+            enemy.y += moveDownDistance; // Baja los enemigos un poco
+            enemy.body.reset(enemy.x, enemy.y);
+        });
+        moveDirection *= -1; // Cambia la dirección después de bajar
     }
 }
+
 
 function manageBullet(bullet) {
     bullet.setVelocityY(-380);
@@ -178,11 +190,18 @@ function manageBullet(bullet) {
                 bullet.destroy();
                 clearInterval(i);
                 isShooting = false;
-                saucer.destroy();
-                saucers.splice(index, 1);
-                score++;
-                ufoCount++;
-                scoreText.setText("Score: " + score);
+
+                // Incrementa el contador de disparos recibidos por el saucer
+                saucer.hits = (saucer.hits || 0) + 1;
+
+                // Destruye el saucer cuando ha recibido dos disparos
+                if (saucer.hits === 2) {
+                    saucer.destroy();
+                    saucers.splice(index, 1);
+                    score++;
+                    ufoCount++;
+                    scoreText.setText("Score: " + score);
+                }
             }
         });
     }, 10);
@@ -248,7 +267,9 @@ function makeSaucer() {
 function manageSaucer(saucer) {
     saucers.push(saucer);
     saucer.isDestroyed = false;
-    saucer.setVelocityX(100); // Configuración anterior para el saucer
+    saucer.setVelocityX(100); // Configuración inicial para el saucer
+
+    // Maneja la destrucción del saucer al llegar a la lava derecha
     scene.physics.add.overlap(saucer, saucerLava, function () {
         saucer.destroy();
         saucer.isDestroyed = true;
