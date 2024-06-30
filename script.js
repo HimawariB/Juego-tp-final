@@ -2,6 +2,7 @@ var config = {
     type: Phaser.AUTO,
     width: 800,
     height: 600,
+    parent: 'game-container', // Añadido para seleccionar el contenedor
     physics: {
         default: 'arcade',
         arcade: {
@@ -43,11 +44,9 @@ var moveDirection = 1; // 1: derecha, -1: izquierda
 var moveDownDistance = 20;
 var moveDistance = 10;
 var enemyFireInterval = 3000; // Intervalo de disparo inicial de los enemigos
-var saucers = [];
 
 var cursors, keyA, keyD, keyR, shooter, scoreText, livesText, startText, gameOverText, gameOverScoreText, enemies, scene, playerLava, enemyLava, saucerLava;
 var isShooting = false;
-var enemyFireIntervalId;
 
 function preload() {
     this.load.image("shooter", "assets/araña.png");
@@ -61,7 +60,6 @@ function create() {
     cursors = scene.input.keyboard.createCursorKeys();
     keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-    keyR = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
     isShooting = false;
     this.input.keyboard.addCapture('SPACE');
     enemies = this.physics.add.group();
@@ -92,7 +90,7 @@ function create() {
             startText.destroy();
             initEnemies();
             setInterval(makeSaucer, 15000);
-            enemyFireIntervalId = setInterval(enemyFire, enemyFireInterval);
+            setInterval(enemyFire, enemyFireInterval);
         } else {
             shoot();
         }
@@ -232,11 +230,11 @@ function manageBullet(bullet) {
                 clearInterval(i);
                 isShooting = false;
 
-                // Incrementa el contador de disparos exitosos al saucer
-                ufoCount++;
+                // Incrementa el contador de disparos recibidos por el saucer
+                saucer.hits = (saucer.hits || 0) + 1;
 
-                // Destruye el saucer después de recibir dos disparos
-                if (ufoCount >= 2) {
+                // Destruye el saucer cuando ha recibido dos disparos
+                if (saucer.hits === 2) {
                     saucer.destroy();
                     saucers.splice(index, 1); // Elimina el saucer del array
                     score += 10; // Incrementa la puntuación por destruir un saucer
@@ -308,6 +306,8 @@ function enemyFire() {
     }
 }
 
+var saucers = [];
+
 function makeSaucer() {
     if (isStarted && !isGameOver) {
         manageSaucer(scene.physics.add.sprite(0, 60, "saucer"));
@@ -327,7 +327,13 @@ function manageSaucer(saucer) {
         if (saucer.isDestroyed) {
             clearInterval(saucerInterval);
         } else if (isStarted && !isGameOver) {
-            manageEnemyBullet(scene.physics.add.sprite(saucer.x, saucer.y, "bullet"), saucer);
+            var bullet = scene.physics.add.sprite(saucer.x, saucer.y, "bullet");
+            manageEnemyBullet(bullet, saucer); // Manejar la bala del saucer
+
+            // Destruir la bala que mata al saucer
+            scene.physics.add.overlap(bullet, saucer, function () {
+                bullet.destroy();
+            });
         }
     }, 2000);
 }
@@ -337,6 +343,11 @@ function end(condition) {
     
     // Pantalla de Game Over
     var gameOverScreen = scene.add.rectangle(0, 0, 800, 600, 0x000000).setOrigin(0);
-    gameOverText = scene.add.text(400, 200, "Game Over", { fontSize: '48px', fill: '#FFF' }).setOrigin(0.5);
-    gameOverScoreText = scene.add.text(400, 300, `Score: ${score}`, { fontSize: '24px', fill: '#FFF' }).setOrigin(0.5);
+    var gameOverText = scene.add.text(400, 200, "Game Over", { fontSize: '48px', fill: '#FFF' }).setOrigin(0.5);
+    var gameOverScoreText = scene.add.text(400, 300, `Score: ${score}`, { fontSize: '24px', fill: '#FFF' }).setOrigin(0.5);
+
+    // Reinicia el juego al hacer clic
+    this.input.on('keydown-R', function () {
+        location.reload();
+    });
 }
