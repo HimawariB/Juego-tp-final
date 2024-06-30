@@ -35,6 +35,7 @@ var enemyInfo = {
 var score = 0;
 var lives = 3;
 var isStarted = false;
+var isGameOver = false;
 var ufoCount = 0;
 var enemySpeed = 1; // Velocidad inicial de los enemigos
 var enemyBulletSpeed = 100; // Velocidad inicial de las balas enemigas
@@ -42,9 +43,11 @@ var moveDirection = 1; // 1: derecha, -1: izquierda
 var moveDownDistance = 20;
 var moveDistance = 10;
 var enemyFireInterval = 3000; // Intervalo de disparo inicial de los enemigos
+var saucers = [];
 
-var cursors, keyA, keyD, shooter, scoreText, livesText, startText, enemies, scene, playerLava, enemyLava, saucerLava;
+var cursors, keyA, keyD, keyR, shooter, scoreText, livesText, startText, gameOverText, gameOverScoreText, enemies, scene, playerLava, enemyLava, saucerLava;
 var isShooting = false;
+var enemyFireIntervalId;
 
 function preload() {
     this.load.image("shooter", "assets/araña.png");
@@ -58,6 +61,7 @@ function create() {
     cursors = scene.input.keyboard.createCursorKeys();
     keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
     keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+    keyR = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
     isShooting = false;
     this.input.keyboard.addCapture('SPACE');
     enemies = this.physics.add.group();
@@ -73,22 +77,28 @@ function create() {
 
     scoreText = scene.add.text(16, 16, "Score: " + score, { fontSize: '18px', fill: '#FFF' });
     livesText = scene.add.text(696, 16, "Lives: " + lives, { fontSize: '18px', fill: '#FFF' });
-    startText = scene.add.text(400, 300, "Click to Play", { fontSize: '18px', fill: '#FFF' }).setOrigin(0.5);
 
-    this.input.keyboard.on('keydown-SPACE', shoot);
+    // Pantalla de inicio
+    var startScreen = scene.add.rectangle(0, 0, 800, 600, 0x000000).setOrigin(0);
+    var titleText = scene.add.text(400, 200, "Web Defender", { fontSize: '48px', fill: '#FFF' }).setOrigin(0.5);
+    startText = scene.add.text(400, 300, "Click to Play", { fontSize: '24px', fill: '#FFF' }).setOrigin(0.5);
 
     this.input.on('pointerdown', function () {
         if (!isStarted) {
             isStarted = true;
+            isGameOver = false;
+            startScreen.destroy();
+            titleText.destroy();
             startText.destroy();
+            initEnemies();
             setInterval(makeSaucer, 15000);
+            enemyFireIntervalId = setInterval(enemyFire, enemyFireInterval);
         } else {
             shoot();
         }
     });
 
-    initEnemies();
-    setInterval(enemyFire, enemyFireInterval);
+    this.input.keyboard.on('keydown-SPACE', shoot);
 
     // Colisión entre enemigos y shooter
     this.physics.add.collider(enemies, shooter, function (shooter, enemy) {
@@ -98,6 +108,12 @@ function create() {
 
         if (lives === 0) {
             end("Lose");
+        }
+    });
+
+    this.input.keyboard.on('keydown-R', function () {
+        if (isGameOver) {
+            location.reload();
         }
     });
 }
@@ -216,19 +232,24 @@ function manageBullet(bullet) {
                 clearInterval(i);
                 isShooting = false;
 
-                // Incrementa el contador de disparos recibidos por el saucer
-                saucer.hits = (saucer.hits || 0) + 1;
+                // Incrementa el contador de disparos exitosos al saucer
+                ufoCount++;
 
-                // Destruye el saucer cuando ha recibido dos disparos
-                if (saucer.hits === 2) {
+                // Destruye el saucer después de recibir dos disparos
+                if (ufoCount >= 2) {
                     saucer.destroy();
-                    saucers.splice(index, 1);
-                    score++;
-                    ufoCount++;
+                    saucers.splice(index, 1); // Elimina el saucer del array
+                    score += 10; // Incrementa la puntuación por destruir un saucer
                     scoreText.setText("Score: " + score);
                 }
             }
         });
+
+        if (checkOverlap(bullet, playerLava)) {
+            bullet.destroy();
+            clearInterval(i);
+            isShooting = false;
+        }
     }, 10);
 
     scene.physics.add.overlap(bullet, playerLava, function () {
@@ -239,12 +260,7 @@ function manageBullet(bullet) {
 }
 
 function manageEnemyBullet(bullet, enemy) {
-    if (!enemy.active) {
-        bullet.destroy();
-        return;
-    }
-
-    var angle = Phaser.Math.Angle.BetweenPoints(enemy, shooter);
+    var angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, shooter.x, shooter.y);
     scene.physics.velocityFromRotation(angle, enemyBulletSpeed, bullet.body.velocity);
 
     var i = setInterval(function () {
@@ -284,7 +300,7 @@ function checkOverlap(spriteA, spriteB) {
 }
 
 function enemyFire() {
-    if (isStarted) {
+    if (isStarted && !isGameOver) {
         var enemy = enemies.children.entries[Phaser.Math.Between(0, enemies.children.entries.length - 1)];
         if (enemy.active) {
             manageEnemyBullet(scene.physics.add.sprite(enemy.x, enemy.y, "bullet"), enemy);
@@ -292,10 +308,8 @@ function enemyFire() {
     }
 }
 
-var saucers = [];
-
 function makeSaucer() {
-    if (isStarted) {
+    if (isStarted && !isGameOver) {
         manageSaucer(scene.physics.add.sprite(0, 60, "saucer"));
     }
 }
@@ -312,13 +326,17 @@ function manageSaucer(saucer) {
     var saucerInterval = setInterval(function () {
         if (saucer.isDestroyed) {
             clearInterval(saucerInterval);
-        } else if (isStarted) {
+        } else if (isStarted && !isGameOver) {
             manageEnemyBullet(scene.physics.add.sprite(saucer.x, saucer.y, "bullet"), saucer);
         }
     }, 2000);
 }
 
-function end(con) {
-    alert(`You ${con}! Score: ` + score);
-    location.reload();
+function end(condition) {
+    isGameOver = true;
+    
+    // Pantalla de Game Over
+    var gameOverScreen = scene.add.rectangle(0, 0, 800, 600, 0x000000).setOrigin(0);
+    gameOverText = scene.add.text(400, 200, "Game Over", { fontSize: '48px', fill: '#FFF' }).setOrigin(0.5);
+    gameOverScoreText = scene.add.text(400, 300, `Score: ${score}`, { fontSize: '24px', fill: '#FFF' }).setOrigin(0.5);
 }
