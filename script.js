@@ -39,10 +39,12 @@ var ufoCount = 0;
 var enemySpeed = 1; // Velocidad inicial de los enemigos
 var enemyBulletSpeed = 100; // Velocidad inicial de las balas enemigas
 var moveDirection = 1; // 1: derecha, -1: izquierda
-var moveDistance = 10;
 var moveDownDistance = 20;
+var moveDistance = 10;
+var enemyFireInterval = 3000; // Intervalo de disparo inicial de los enemigos
 
-var scene, shooter, cursors, keyA, keyD, isShooting, scoreText, livesText, startText, enemies, playerLava, enemyLava, saucerLava;
+var cursors, keyA, keyD, shooter, scoreText, livesText, startText, enemies, scene, playerLava, enemyLava, saucerLava;
+var isShooting = false;
 
 function preload() {
     this.load.image("shooter", "assets/araña.png");
@@ -58,8 +60,6 @@ function create() {
     keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
     isShooting = false;
     this.input.keyboard.addCapture('SPACE');
-    
-    // Grupos y objetos del juego
     enemies = this.physics.add.group();
     playerLava = scene.add.rectangle(0, 0, 800, 10, 0x000).setOrigin(0);
     enemyLava = scene.add.rectangle(0, 590, 800, 10, 0x000).setOrigin(0);
@@ -68,29 +68,27 @@ function create() {
     scene.physics.add.existing(enemyLava);
     scene.physics.add.existing(saucerLava);
 
-    // Creación del jugador (shooter)
     shooter = scene.physics.add.sprite(400, 520, 'shooter');
     shooter.setCollideWorldBounds(true);
 
-    // Textos en pantalla
     scoreText = scene.add.text(16, 16, "Score: " + score, { fontSize: '18px', fill: '#FFF' });
     livesText = scene.add.text(696, 16, "Lives: " + lives, { fontSize: '18px', fill: '#FFF' });
     startText = scene.add.text(400, 300, "Click to Play", { fontSize: '18px', fill: '#FFF' }).setOrigin(0.5);
 
-    // Eventos de entrada (teclado y ratón)
     this.input.keyboard.on('keydown-SPACE', shoot);
+
     this.input.on('pointerdown', function () {
         if (!isStarted) {
             isStarted = true;
             startText.destroy();
-            setInterval(makeSaucer, 15000); // Cada 15 segundos aparece un saucer
+            setInterval(makeSaucer, 15000);
         } else {
             shoot();
         }
     });
 
-    initEnemies(); // Inicializa los enemigos
-    setInterval(enemyFire, 3000); // Disparo de los enemigos cada 3 segundos
+    initEnemies();
+    setInterval(enemyFire, enemyFireInterval);
 
     // Colisión entre enemigos y shooter
     this.physics.add.collider(enemies, shooter, function (shooter, enemy) {
@@ -106,7 +104,6 @@ function create() {
 
 function update() {
     if (isStarted) {
-        // Movimiento del jugador (shooter)
         if (cursors.left.isDown || keyA.isDown) {
             shooter.setVelocityX(-160);
         } else if (cursors.right.isDown || keyD.isDown) {
@@ -115,7 +112,7 @@ function update() {
             shooter.setVelocityX(0);
         }
 
-        moveEnemies(); // Movimiento de los enemigos en cada actualización
+        moveEnemies(); // Mueve los enemigos en cada actualización
     }
 }
 
@@ -139,17 +136,40 @@ function initEnemies() {
 }
 
 function resetEnemies() {
-    enemySpeed += 1;  // Incrementa la velocidad de los enemigos en 5
-    enemyBulletSpeed += 40;  // Incrementa la velocidad de las balas enemigas en 40
-    initEnemies();
+    enemies.clear(true, true); // Elimina todos los enemigos existentes
+
+    // Incrementa la velocidad de los enemigos al regenerarse
+    enemySpeed += 1;
+
+    // Disminuye el intervalo de disparo de los enemigos al regenerarse
+    enemyFireInterval = Math.max(500, enemyFireInterval - 250); // Aseguramos que no sea menor a 500ms
+
+    // Aumenta la velocidad de las balas enemigas al regenerarse
+    enemyBulletSpeed += 20;
+
+    // Determina la dirección de movimiento para la nueva oleada de enemigos
+    moveDirection = 1;
+
+    for (var c = 0; c < enemyInfo.count.col; c++) {
+        for (var r = 0; r < enemyInfo.count.row; r++) {
+            var enemyX = (c * (enemyInfo.width + enemyInfo.padding)) + enemyInfo.offset.left;
+            var enemyY = (r * (enemyInfo.height + enemyInfo.padding)) + enemyInfo.offset.top;
+            var enemy = enemies.create(enemyX, enemyY, 'alien').setOrigin(0.5);
+            enemy.setSize(enemyInfo.width * 0.8, enemyInfo.height * 0.8).setOffset(enemyInfo.width * 0.1, enemyInfo.height * 0.1);
+        }
+    }
+
+    // Actualiza el intervalo de disparo
+    clearInterval(enemyFireIntervalId);
+    enemyFireIntervalId = setInterval(enemyFire, enemyFireInterval);
 }
 
 function moveEnemies() {
     var moveDown = false;
     enemies.children.each(function (enemy) {
         enemy.x += enemySpeed * moveDirection;
-        
-        // Verifica si el enemigo debe moverse hacia abajo al llegar a los bordes
+
+        // Verifica si el enemigo debe moverse hacia los bordes antes de bajar
         if (enemy.x <= enemyInfo.offset.left || enemy.x >= config.width - enemyInfo.offset.left - enemy.width) {
             moveDown = true;
         }
@@ -162,9 +182,14 @@ function moveEnemies() {
             enemy.body.reset(enemy.x, enemy.y);
         });
         moveDirection *= -1; // Cambia la dirección después de bajar
+
+        // Si todos los enemigos se han eliminados y la dirección es hacia la izquierda,
+        // regenerar la oleada de enemigos con dirección hacia la derecha
+        if (enemies.countActive(true) === 0 && moveDirection === -1) {
+            resetEnemies();
+        }
     }
 }
-
 
 function manageBullet(bullet) {
     bullet.setVelocityY(-380);
@@ -223,6 +248,12 @@ function manageEnemyBullet(bullet, enemy) {
     scene.physics.velocityFromRotation(angle, enemyBulletSpeed, bullet.body.velocity);
 
     var i = setInterval(function () {
+        if (!enemy.active) {
+            bullet.destroy();
+            clearInterval(i);
+            return;
+        }
+
         if (checkOverlap(bullet, shooter)) {
             bullet.destroy();
             clearInterval(i);
@@ -232,6 +263,11 @@ function manageEnemyBullet(bullet, enemy) {
             if (lives === 0) {
                 end("Lose");
             }
+        }
+
+        if (checkOverlap(bullet, enemyLava)) {
+            bullet.destroy();
+            clearInterval(i);
         }
     }, 10);
 
@@ -267,9 +303,7 @@ function makeSaucer() {
 function manageSaucer(saucer) {
     saucers.push(saucer);
     saucer.isDestroyed = false;
-    saucer.setVelocityX(100); // Configuración inicial para el saucer
-
-    // Maneja la destrucción del saucer al llegar a la lava derecha
+    saucer.setVelocityX(100); // Configuración anterior para el saucer
     scene.physics.add.overlap(saucer, saucerLava, function () {
         saucer.destroy();
         saucer.isDestroyed = true;
