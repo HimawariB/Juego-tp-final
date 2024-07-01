@@ -101,6 +101,12 @@ class Game extends Phaser.Scene {
             callbackScope: this,
             loop: true
         });
+        this.saucerFireInterval = this.time.addEvent({
+            delay: 2000,
+            callback: this.saucerFire,
+            callbackScope: this,
+            loop: true
+        });
     }
 
     shoot() {
@@ -226,6 +232,40 @@ class Game extends Phaser.Scene {
         }, 10);
     }
 
+    saucerFire() {
+        if (this.isStarted && !this.isGameOver) {
+            const saucer = Phaser.Math.RND.pick(this.saucers.filter(saucer => saucer.active));
+            if (saucer) {
+                this.manageSaucerBullet(this.physics.add.sprite(saucer.x, saucer.y, "bullet"), saucer);
+            }
+        }
+    }
+
+    manageSaucerBullet(bullet, saucer) {
+        const angle = Phaser.Math.Angle.Between(saucer.x, saucer.y, this.shooter.x, this.shooter.y);
+        this.physics.velocityFromRotation(angle, 100, bullet.body.velocity);
+        const i = setInterval(() => {
+            if (!saucer.active) {
+                bullet.destroy();
+                clearInterval(i);
+                return;
+            }
+            if (this.checkOverlap(bullet, this.shooter)) {
+                bullet.destroy();
+                clearInterval(i);
+                this.lives--;
+                this.livesText.setText("Lives: " + this.lives);
+                if (this.lives === 0) {
+                    this.end("Lose");
+                }
+            }
+            if (this.checkOverlap(bullet, this.enemyLava)) {
+                bullet.destroy();
+                clearInterval(i);
+            }
+        }, 10);
+    }
+
     makeSaucer() {
         if (this.isStarted && !this.isGameOver) {
             const saucer = this.physics.add.sprite(10, 50, "saucer").setVelocityX(80);
@@ -257,6 +297,7 @@ class Game extends Phaser.Scene {
         this.isGameOver = true;
         this.saucerInterval.remove();
         this.enemyFireInterval.remove();
+        this.saucerFireInterval.remove();
         this.scene.start('End', { score: this.score });
     }
 }
