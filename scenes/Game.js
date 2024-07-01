@@ -66,6 +66,13 @@ class Game extends Phaser.Scene {
                 this.scene.start('Game');
             }
         });
+
+        // Inicializar variables de velocidad
+        this.enemySpeed = 1;
+        this.saucerSpeed = 80;
+        this.enemyBulletSpeed = 100;
+        this.saucerBulletSpeed = 100;
+        this.enemyFireIntervalTime = 3000;
     }
 
     update() {
@@ -96,7 +103,7 @@ class Game extends Phaser.Scene {
             loop: true
         });
         this.enemyFireInterval = this.time.addEvent({
-            delay: 3000,
+            delay: this.enemyFireIntervalTime,
             callback: this.enemyFire,
             callbackScope: this,
             loop: true
@@ -126,13 +133,18 @@ class Game extends Phaser.Scene {
                 enemy.setSize(32, 16).setOffset(4, 2);
             }
         }
+
+        // Incrementar la velocidad de los enemigos y sus balas
+        this.enemySpeed *= 1.5;
+        this.enemyBulletSpeed *= 1;
+        this.enemyFireIntervalTime = Math.max(100, this.enemyFireIntervalTime - 250); // No disminuir por debajo de 1000ms
     }
 
     moveEnemies() {
         let moveDown = false;
 
         this.enemies.children.each((enemy) => {
-            enemy.x += this.enemyDirection;
+            enemy.x += this.enemyDirection * this.enemySpeed;
             if (enemy.x <= 60 && this.enemyDirection === -1) {
                 moveDown = true;
             } else if (enemy.x >= 740 && this.enemyDirection === 1) {
@@ -209,7 +221,7 @@ class Game extends Phaser.Scene {
 
     manageEnemyBullet(bullet, enemy) {
         const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.shooter.x, this.shooter.y);
-        this.physics.velocityFromRotation(angle, 100, bullet.body.velocity);
+        this.physics.velocityFromRotation(angle, this.enemyBulletSpeed, bullet.body.velocity);
         const i = setInterval(() => {
             if (!enemy.active) {
                 bullet.destroy();
@@ -243,7 +255,7 @@ class Game extends Phaser.Scene {
 
     manageSaucerBullet(bullet, saucer) {
         const angle = Phaser.Math.Angle.Between(saucer.x, saucer.y, this.shooter.x, this.shooter.y);
-        this.physics.velocityFromRotation(angle, 100, bullet.body.velocity);
+        this.physics.velocityFromRotation(angle, this.saucerBulletSpeed, bullet.body.velocity);
         const i = setInterval(() => {
             if (!saucer.active) {
                 bullet.destroy();
@@ -268,7 +280,7 @@ class Game extends Phaser.Scene {
 
     makeSaucer() {
         if (this.isStarted && !this.isGameOver) {
-            const saucer = this.physics.add.sprite(10, 50, "saucer").setVelocityX(80);
+            const saucer = this.physics.add.sprite(10, 50, "saucer").setVelocityX(this.saucerSpeed);
             this.saucers.push(saucer);
 
             const i = setInterval(() => {
@@ -290,6 +302,10 @@ class Game extends Phaser.Scene {
                     clearInterval(i);
                 }
             }, 10);
+
+            // Incrementar la velocidad del saucer
+            this.saucerSpeed *= 1.1;
+            this.saucerBulletSpeed *= 1.1;
         }
     }
 
