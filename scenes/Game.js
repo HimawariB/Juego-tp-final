@@ -9,7 +9,7 @@ class Game extends Phaser.Scene {
         this.load.image("playerBullet", "assets/bala.png"); 
         this.load.image("enemyBullet", "assets/balaEnemigo.png");
         this.load.image("saucer", "assets/abejados.png");
-        this.load.image('background', 'assets/fondo.jpg');
+        this.load.image('background', 'public/fondo.jpg');
     }
 
     create() {
