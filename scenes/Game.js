@@ -6,12 +6,16 @@ class Game extends Phaser.Scene {
     preload() {
         this.load.image("shooter", "assets/araña.png");
         this.load.image("alien", "assets/abeja.png");
-        this.load.image("bullet", "assets/bala.png");
+        this.load.image("playerBullet", "assets/bala.png"); 
+        this.load.image("enemyBullet", "assets/balaEnemigo.png");
         this.load.image("saucer", "assets/abejados.png");
-        this.load.image('gameOverScreen', 'assets/gameOverScreen.png');
+        this.load.image('background', 'assets/fondo.jpg');
     }
 
     create() {
+    
+        this.add.image(400, 300, 'background').setOrigin(0.5, 0.5).setDepth(-1).setDisplaySize(800, 600);
+
         this.cursors = this.input.keyboard.createCursorKeys();
         this.keyA = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
         this.keyD = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
@@ -67,7 +71,7 @@ class Game extends Phaser.Scene {
             }
         });
 
-        // Inicializar variables de velocidad
+        
         this.enemySpeed = 1;
         this.saucerSpeed = 80;
         this.enemyBulletSpeed = 100;
@@ -118,7 +122,7 @@ class Game extends Phaser.Scene {
 
     shoot() {
         if (this.isStarted && !this.isShooting) {
-            this.manageBullet(this.physics.add.sprite(this.shooter.x, this.shooter.y, "bullet"));
+            this.manageBullet(this.physics.add.sprite(this.shooter.x, this.shooter.y, "playerBullet"));
             this.isShooting = true;
         }
     }
@@ -134,10 +138,10 @@ class Game extends Phaser.Scene {
             }
         }
 
-        // Incrementar la velocidad de los enemigos y sus balas
+        
         this.enemySpeed *= 1.5;
-        this.enemyBulletSpeed *= 1;
-        this.enemyFireIntervalTime = Math.max(100, this.enemyFireIntervalTime - 250); // No disminuir por debajo de 1000ms
+        this.enemyBulletSpeed *= 1.6;
+        this.enemyFireIntervalTime = Math.max(1000, this.enemyFireIntervalTime * 0.9);
     }
 
     moveEnemies() {
@@ -214,14 +218,13 @@ class Game extends Phaser.Scene {
         if (this.isStarted && !this.isGameOver) {
             const enemy = Phaser.Math.RND.pick(this.enemies.getChildren().filter(enemy => enemy.active));
             if (enemy) {
-                this.manageEnemyBullet(this.physics.add.sprite(enemy.x, enemy.y, "bullet"), enemy);
+                this.manageEnemyBullet(this.physics.add.sprite(enemy.x, enemy.y, "enemyBullet").setScale(1.5), enemy); // Cambiado a enemyBullet con escala
             }
         }
     }
 
     manageEnemyBullet(bullet, enemy) {
-        const angle = Phaser.Math.Angle.Between(enemy.x, enemy.y, this.shooter.x, this.shooter.y);
-        this.physics.velocityFromRotation(angle, this.enemyBulletSpeed, bullet.body.velocity);
+        bullet.setVelocityY(this.enemyBulletSpeed);
         const i = setInterval(() => {
             if (!enemy.active) {
                 bullet.destroy();
@@ -248,7 +251,7 @@ class Game extends Phaser.Scene {
         if (this.isStarted && !this.isGameOver) {
             const saucer = Phaser.Math.RND.pick(this.saucers.filter(saucer => saucer.active));
             if (saucer) {
-                this.manageSaucerBullet(this.physics.add.sprite(saucer.x, saucer.y, "bullet"), saucer);
+                this.manageSaucerBullet(this.physics.add.sprite(saucer.x, saucer.y, "enemyBullet").setScale(1.5), saucer); // Cambiado a enemyBullet con escala
             }
         }
     }
@@ -303,7 +306,7 @@ class Game extends Phaser.Scene {
                 }
             }, 10);
 
-            // Incrementar la velocidad del saucer
+        
             this.saucerSpeed *= 1.1;
             this.saucerBulletSpeed *= 1.1;
         }

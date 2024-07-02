@@ -4,13 +4,20 @@ class End extends Phaser.Scene {
     }
 
     preload() {
-        this.load.image('gameOverScreen', 'assets/gameOverScreen.png');
+        // Ya no cargamos la imagen de 'gameOverScreen'
+        // this.load.image('gameOverScreen', 'assets/gameOverScreen.png');
     }
 
     create(data) {
-        this.add.image(400, 300, 'gameOverScreen');
+        // Eliminar la imagen de 'gameOverScreen'
+        // this.add.image(400, 300, 'gameOverScreen');
 
-        const scoreText = this.add.text(400, 200, `Score: ${data.score}`, {
+        const gameOverText = this.add.text(400, 150, 'Game Over', {
+            fontSize: '64px',
+            fill: '#fff'
+        }).setOrigin(0.5);
+
+        const scoreText = this.add.text(400, 250, `Score: ${data.score}`, {
             fontSize: '32px',
             fill: '#fff'
         }).setOrigin(0.5);
@@ -27,3 +34,4 @@ class End extends Phaser.Scene {
 }
 
 export default End;
+
